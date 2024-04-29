@@ -1,0 +1,328 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foursquare Leaderboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #fff;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    #leaderboard-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      animation: fadeIn 1s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    #leaderboard {
+      margin-bottom: 20px;
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    #leaderboard th,
+    #leaderboard td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+
+    #leaderboard th {
+      background-color: #f2f2f2;
+    }
+
+    .upvote,
+    .downvote,
+    .refresh-btn {
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 8px 15px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .upvote:hover,
+    .downvote:hover,
+    .refresh-btn:hover {
+      background-color: #0056b3;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: #007bff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    .badge {
+      font-weight: bold;
+      padding: 5px 10px;
+      border-radius: 20px;
+      background-color: gold;
+      color: white; /* Changed color to white */
+    }
+
+    .badge-silver {
+      background-color: silver;
+      color: white;
+    }
+
+    .badge-bronze {
+      background-color: #cd7f32;
+      color: white;
+    }
+
+    .badge-moderator {
+      background-color: #f2f2f2; /* Dark green color */
+      color: black;
+    }
+
+    .animate {
+      animation: scaleUp 0.5s ease;
+    }
+
+    @keyframes scaleUp {
+      from {
+        transform: scale(0);
+      }
+      to {
+        transform: scale(1);
+      }
+    }
+
+    .animate-top {
+      animation: animateTop 1s ease;
+    }
+
+    @keyframes animateTop {
+      0% {
+        transform: translateY(-50px);
+        opacity: 0;
+      }
+      100% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .animate-fade {
+      animation: animateFade 1s ease;
+    }
+
+    @keyframes animateFade {
+      0% {
+        opacity: 0;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .cool-message {
+      text-align: center;
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #007bff;
+      color: #fff;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Foursquare Leaderboard</h1>
+
+  <div id="leaderboard-container">
+    <table id="leaderboard">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Upvotes</th>
+          <th>Downvotes</th>
+          <th>Rank</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+    </div>
+    <button class="refresh-btn" onclick="refreshLeaderboard()">Refresh Leaderboard</button>
+  </div>
+
+  <div class="cool-message">
+    ©️ Sing Developments<br />
+    Please do not vote for yourself and/or incessantly upvote or downvote a
+    user for a reason not based on skill. Use upvote/downvote for requesting a
+    progress/demotion in rank. Thanks Walter for hosting this on your website!
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBPrsBIPdDSAdakt3S9yd2a83Mt6a0O4Qg",
+      authDomain: "foursquare-leaderboard.firebaseapp.com",
+      projectId: "foursquare-leaderboard",
+      storageBucket: "foursquare-leaderboard.appspot.com",
+      messagingSenderId: "294979396523",
+      appId: "1:294979396523:web:b5a00b4800d122fbf268ee",
+      measurementId: "G-CR9Z7C2L3K",
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function renderLeaderboard() {
+      const leaderboardTable = document
+        .getElementById("leaderboard")
+        .getElementsByTagName("tbody")[0];
+      leaderboardTable.innerHTML = "";
+      db.ref("leaderboard")
+        .orderByChild("rank")
+        .once("value", (snapshot) => {
+          snapshot.forEach((childSnapshot) => {
+            const player = childSnapshot.val();
+            const playerId = childSnapshot.key;
+            const row = leaderboardTable.insertRow();
+            row.innerHTML = `
+<td>${player.name} ${getBadge(player.name, player.rank)}</td>
+<td>${player.upvotes}</td>
+<td>${player.downvotes}</td>
+<td>${getRank(player.rank)}</td>
+<td>
+  <button class="upvote" onclick="vote('${playerId}', 'up')">Upvote</button>
+  <button class="downvote" onclick="vote('${playerId}', 'down')">Downvote</button>
+</td>
+`;
+
+            if (player.rank === 1) {
+              row.classList.add("animate");
+            }
+          });
+          document.getElementById("loading").style.display = "none";
+        });
+    }
+
+    function getBadge(name, rank) {
+      if (name === "Silas") {
+        return '<span class="badge badge-moderator">Admin</span>';
+      } else if (name === "Walter") {
+        return '<span class="badge badge-moderator">Moderator</span>';
+      } else if (rank === 1) {
+        return '<span class="badge">Gold Player</span>';
+      } else if (rank === 2) {
+        return '<span class="badge badge-silver">Silver Player</span>';
+      } else if (rank === 3) {
+        return '<span class="badge badge-bronze">Bronze Player</span>';
+      } else {
+        return "";
+      }
+    }
+
+    function getRank(rank) {
+      return rank > 0 && rank <= 10 ? rank : "-";
+    }
+
+    function vote(playerId, type) {
+      db.ref("leaderboard/" + playerId).once("value", (snapshot) => {
+        const player = snapshot.val();
+        let newUpvotes = player.upvotes;
+        let newDownvotes = player.downvotes;
+
+        if (
+          type === "up" &&
+          newUpvotes - player.upvotes >= 5 &&
+          player.rank > 1
+        ) {
+          newUpvotes = player.upvotes;
+          newDownvotes = 0;
+          updateRank(playerId, player.rank - 1);
+        } else if (
+          type === "down" &&
+          newDownvotes - player.downvotes >= 5 &&
+          player.rank < 10
+        ) {
+          newUpvotes = 0;
+          newDownvotes = player.downvotes;
+          updateRank(playerId, player.rank + 1);
+        }
+
+        db.ref("leaderboard/" + playerId).update({
+          upvotes: type === "up" ? newUpvotes + 1 : newUpvotes,
+          downvotes: type === "down" ? newDownvotes + 1 : newDownvotes,
+        });
+        renderLeaderboard();
+      });
+    }
+
+    function updateRank(playerId, newRank) {
+      db.ref("leaderboard")
+        .orderByChild("rank")
+        .equalTo(newRank)
+        .once("value", (snapshot) => {
+          snapshot.forEach((childSnapshot) => {
+            const otherPlayerId = childSnapshot.key;
+            db.ref("leaderboard/" + otherPlayerId).update({
+              rank: newRank + 1,
+            });
+          });
+        });
+    }
+
+    function refreshLeaderboard() {
+      const refreshBtn = document.querySelector('.refresh-btn');
+      refreshBtn.classList.add('animate-spin');
+      setTimeout(() => {
+        refreshBtn.classList.remove('animate-spin');
+      }, 2000);
+      renderLeaderboard();
+    }
+
+    renderLeaderboard();
+  </script>
+</body>
+</html>
