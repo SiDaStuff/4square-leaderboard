@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foursquare Leaderboard Moderator Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11" />
+  <link rel="icon" type="image/png" href="icon.png" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f3f3f3;
+      margin: 0;
+      padding: 0;
+    }
+    #dashboard {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      background-color: #fff;
+    }
+    h1,
+    h2 {
+      text-align: center;
+      color: #0073e6;
+    }
+    label {
+      font-weight: bold;
+    }
+    input[type="text"],
+    textarea,
+    select {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button.confirmButton {
+      background-color: #0073e6;
+      color: white;
+    }
+    button.confirmButton:hover {
+      background-color: #66a3ff;
+    }
+    button.cancelButton {
+      background-color: #ff0000;
+      color: white;
+    }
+    button.cancelButton:hover {
+      background-color: #ff6666;
+    }
+    .swal2-modal {
+      width: 50% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      text-align: center !important;
+    }
+    .swal2-content {
+      text-align: left;
+    }
+    .swal2-input,
+    .swal2-select {
+      text-align: center;
+      margin: auto;
+    }
+    .swal2-textarea {
+      resize: vertical;
+      text-align: left;
+    }
+    #chatContainer {
+      height: 300px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+    }
+    #chatInput {
+      width: calc(100% - 22px);
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    .chatMessage {
+      margin-bottom: 5px;
+      padding: 5px;
+      border-radius: 5px;
+      background-color: #e6f2ff;
+      text-align: left;
+    }
+    #loadingIcon {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .leaderboard-swal2-modal {
+      width: 100vw !important;
+      max-width: none !important;
+      padding: 0 !important;
+    }
+    .ip-ban-swal2-modal {
+      max-width: 3000px !important;
+    }
+    .ban-success-swal2-modal,
+    .ban-error-swal2-modal {
+      max-width: 3000px !important;
+    }
+    .users-swal2-modal {
+      max-width: 3000px !important;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBPrsBIPdDSAdakt3S9yd2a83Mt6a0O4Qg",
+  authDomain: "foursquare-leaderboard.firebaseapp.com",
+  databaseURL: "https://foursquare-leaderboard-default-rtdb.firebaseio.com",
+  projectId: "foursquare-leaderboard",
+  storageBucket: "foursquare-leaderboard.appspot.com",
+  messagingSenderId: "294979396523",
+  appId: "1:294979396523:web:0f14be10d99e3d6bf268ee",
+  measurementId: "G-T6M8TSMP5M"
+};
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let moderatorKey;
+    let userIp;
+
+    function loadPage() {
+      fetch('https://api.ipify.org/?format=txt')
+        .then(response => response.text())
+        .then(ip => {
+          userIp = ip;
+          checkIpBan(ip)
+            .then(isBanned => {
+              if (isBanned) {
+                Swal.fire({
+                  title: "Access Denied",
+                  text: "Your IP is banned.",
+                  icon: "error",
+                  timer: 3000,
+                  timerProgressBar: true,
+                  didOpen: () => {
+                    setTimeout(() => {
+                      window.close();
+                    }, 3000);
+                  },
+                });
+              } else {
+                promptModeratorKey();
+              }
+            });
+        })
+        .catch(error => {
+          Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: `Failed to get IP address: ${error.message}`,
+          });
+        });
+    }
+
+    function promptModeratorKey() {
+      Swal.fire({
+        title: "Enter Moderator Key",
+        input: "text",
+        inputAttributes: {
+          autocapitalize: "off",
+          style: "text-align: center",
+        },
+        showCancelButton: true,
+        confirmButtonText: "Enter",
+        showLoaderOnConfirm: true,
+        preConfirm: (modKey) => {
+          return checkModeratorKey(modKey);
+        },
+      }).then((result) => {
+        if (result.isConfirmed) {
+          document.getElementById("dashboard").style.display = "block";
+          document.getElementById(
+            "moderatorKeyDisplay"
+          ).innerText = `Moderator Key: ${result.value}`;
+          const currentDate = new Date();
+          document.getElementById(
+            "dateTimeDisplay"
+          ).innerText = `Current Date and Time: ${currentDate.toLocaleString()}`;
+          setInterval(updateTime, 1000);
+          readInfo();
+          setInterval(refreshChat, 1000);
+        } else {
+          Swal.fire({
+            title: "Hack Detected!",
+            text: "Unauthorized User!",
+            icon: "error",
+            timer: 3000,
+            timerProgressBar: true,
+            didOpen: () => {
+              setTimeout(() => {
+                window.close();
+              }, 3000);
+            },
+          });
+        }
+      });
+    }
+
+    function updateTime() {
+      const currentDate = new Date();
+      document.getElementById(
+        "dateTimeDisplay"
+      ).innerText = `Current Date and Time: ${currentDate.toLocaleString()}`;
+    }
+
+    function checkModeratorKey(modKey) {
+      return db
+        .ref("modkeys")
+        .once("value")
+        .then((snapshot) => {
+          const keys = snapshot.val();
+          if (!keys || !Object.values(keys).includes(modKey)) {
+            throw new Error("Wrong moderator key. Please try again.");
+          }
+          moderatorKey = modKey;
+          return moderatorKey;
+        })
+        .catch((error) => {
+          Swal.showValidationMessage(`${error}`);
+        });
+    }
+
+    function sendInfo() {
+      if (!validateModeratorKey()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        const name = document.getElementById("name").value;
+        const suggestedRank = document.getElementById("suggestedRank").value;
+        const detail = document.getElementById("detail").value;
+
+        if (name && suggestedRank && detail && moderatorKey) {
+          db.ref("mod")
+            .push({
+              name: name,
+              suggestedRank: suggestedRank,
+              detail: detail,
+              moderatorKey: moderatorKey,
+              ip: userIp,
+              timestamp: firebase.database.ServerValue.TIMESTAMP,
+            })
+            .then(() => {
+              refreshPage();
+              Swal.fire({
+                icon: "success",
+                title: "Success!",
+                text: "Main info sent successfully.",
+                confirmButtonText: "Close",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+              });
+            });
+        } else {
+          Swal.fire({
+            icon: "error",
+            title: "Oops...",
+            text: "Please fill in all fields.",
+          });
+        }
+      });
+    }
+
+    function readInfo() {
+      if (!validateModeratorKey()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        const infoContainer = document.getElementById("infoContainer");
+        Swal.fire({
+          title: "Loading",
+          html: "Loading...",
+          timerProgressBar: true,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+        });
+        db.ref("mod")
+          .orderByChild("timestamp")
+          .once("value", (snapshot) => {
+            infoContainer.innerHTML = "";
+            const sortedEntries = [];
+            snapshot.forEach((childSnapshot) => {
+              sortedEntries.unshift(childSnapshot.val());
+            });
+            sortedEntries.forEach((info) => {
+              const div = document.createElement("div");
+              const date = new Date(info.timestamp);
+              const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+              div.innerHTML = `<strong>Name:</strong> ${info.name}<br>
+                           <strong>Suggested Rank:</strong> ${info.suggestedRank}<br>
+                           <strong>Detail:</strong> ${info.detail}<br>
+                           <strong>Moderator Key:</strong> ${info.moderatorKey}<br>
+                           <strong>IP:</strong> ${info.ip}<br>
+                           <strong>Time:</strong> ${formattedDate}<br><br>`;
+              infoContainer.appendChild(div);
+            });
+            Swal.close();
+          });
+      });
+    }
+
+    function refreshPage() {
+      location.reload();
+    }
+
+    function goToHome() {
+      location.href = "https://foursquare-leaderboard.web.app";
+    }
+
+    function openChat() {
+      Swal.fire({
+        title: "Chat",
+        html: `
+          <div id="chatContainer"></div>
+          <input type="text" id="chatInput" placeholder="Type a message" class="swal2-input" style="margin-top: 10px;">
+          <div style="text-align: left; font-size: 12px; padding-left: 10px; margin-top: 12px;">Press Enter to send, click outside of the window to close.</div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        showConfirmButton: false,
+        didOpen: () => {
+          const chatContainer = document.getElementById("chatContainer");
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+          document.getElementById("chatInput").addEventListener("keypress", (event) => {
+            if (event.key === "Enter") {
+              sendMessage();
+            }
+          });
+          refreshChat();
+          setInterval(refreshChat, 1000);
+        },
+        willClose: () => {
+          clearInterval(refreshChat);
+        },
+        customClass: {
+          container: 'chat-swal2-modal'
+        }
+      });
+    }
+
+    function sendMessage() {
+      if (!validateModeratorKey()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        const message = document.getElementById("chatInput").value.trim();
+        if (message !== "") {
+          db.ref("chat")
+            .push({
+              message: message,
+              moderatorKey: moderatorKey,
+              timestamp: firebase.database.ServerValue.TIMESTAMP,
+            })
+            .then(() => {
+              document.getElementById("chatInput").value = "";
+            });
+        }
+      });
+    }
+
+    function refreshChat() {
+      if (!validateModeratorKey()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        const chatContainer = document.getElementById("chatContainer");
+        db.ref("chat")
+          .orderByChild("timestamp")
+          .once("value", (snapshot) => {
+            chatContainer.innerHTML = "";
+            const chatMessages = [];
+            snapshot.forEach((childSnapshot) => {
+              chatMessages.push(childSnapshot.val());
+            });
+            chatMessages.forEach((chatData) => {
+              const messageDiv = document.createElement("div");
+              messageDiv.classList.add("chatMessage");
+              const formattedDate = new Date(
+                chatData.timestamp
+              ).toLocaleString();
+              messageDiv.innerText = `${formattedDate}, ${chatData.moderatorKey}: ${chatData.message}`;
+              chatContainer.appendChild(messageDiv);
+            });
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          });
+      });
+    }
+
+    function openLeaderboard() {
+      window.open("https://foursquare-leaderboard.web.app", "_blank");
+    }
+
+    function requestFeature() {
+      window.open("https://foursquare-leaderboard.web.app/feature-request.html");
+    }
+
+    function validateModeratorKey() {
+      if (!moderatorKey) {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: "Bad Mod Key",
+        });
+        return false;
+      }
+      return true;
+    }
+
+    function openIpBanForm() {
+      if (!validateModeratorKey()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        Swal.fire({
+          title: 'Ban IP',
+          html: `
+            <label for="ipInput">Input IP:</label>
+            <input type="text" id="ipInput" class="swal2-input" placeholder="Enter IP address">
+            <label for="banType">Select Ban Type:</label>
+            <select id="banType" class="swal2-input">
+              <option value="permanent">Permanent</option>
+              <option value="time">24 Hour</option>
+            </select>
+
+            Only Admins may unban users. This action WILL be logged.
+          `,
+          focusConfirm: false,
+          showCancelButton: true,
+          confirmButtonText: 'Send',
+          preConfirm: () => {
+            const ip = document.getElementById('ipInput').value;
+            const banType = document.getElementById('banType').value;
+            if (!ip) {
+              Swal.showValidationMessage('Please enter an IP address');
+              return false;
+            }
+            return { ip, banType };
+          },
+          customClass: {
+            container: 'ip-ban-swal2-modal'
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            const { ip, banType } = result.value;
+            banIp(ip, banType);
+          }
+        });
+      });
+    }
+
+    function banIp(ip, banType) {
+  const formattedIp = ip.replace(/\./g, '_');
+  const banData = { 
+    unbanTime: banType === 'permanent' ? 89898989898989900000 : new Date().getTime() + 86400000
+  };
+
+  const logData = {
+    bannedIp: ip,
+    moderatorKey: moderatorKey,
+    timestamp: new Date().toISOString()
+  };
+
+  const updates = {};
+  updates[`banned/${formattedIp}`] = banData;
+  updates[`banLogs/${formattedIp}`] = logData;
+
+  return db.ref().update(updates)
+    .then(() => {
+      Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'IP has been banned successfully.',
+        confirmButtonText: 'Close',
+        customClass: {
+          container: 'ban-success-swal2-modal'
+        }
+      });
+    })
+    .catch((error) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: `Failed to ban IP: ${error.message}`,
+        customClass: {
+          container: 'ban-error-swal2-modal'
+        }
+      });
+    });
+}
+
+
+    function checkIpBan(ip) {
+      const formattedIp = ip.replace(/\./g, '_');
+      return db.ref(`banned/${formattedIp}`).once('value')
+        .then((snapshot) => {
+          const banData = snapshot.val();
+          if (banData && banData.unbanTime > new Date().getTime()) {
+            return true;
+          }
+          return false;
+        });
+    }
+
+    function openUsers() {
+  if (!validateModeratorKey()) return;
+  checkIpBan(userIp).then(isBanned => {
+    if (isBanned) return;
+
+    Swal.fire({
+      title: 'Users',
+      html: `
+        <select id="searchBy" class="swal2-select">
+          <option value="firstname">First Name</option>
+          <option value="lastname">Last Name</option>
+          <option value="ipaddress">IP Address</option>
+        </select>
+        <input type="text" id="searchUser" class="swal2-input" placeholder="Search...">
+        <div id="usersTableContainer"></div>
+      `,
+      showCloseButton: true,
+      didOpen: () => {
+        const searchInput = document.getElementById('searchUser');
+        const searchBy = document.getElementById('searchBy');
+        
+        searchInput.addEventListener('input', () => {
+          filterUsers(searchInput.value.trim().toLowerCase(), searchBy.value);
+        });
+        
+        fetchUsers();
+      },
+      customClass: {
+        container: 'users-swal2-modal'
+      }
+    });
+  });
+}
+
+function fetchUsers() {
+  const usersTableContainer = document.getElementById('usersTableContainer');
+  db.ref('users')
+    .on('value', (snapshot) => {
+      usersTableContainer.innerHTML = '';
+      snapshot.forEach((userSnapshot) => {
+        const userData = userSnapshot.val();
+        const userDiv = document.createElement('div');
+        userDiv.classList.add('userRow');
+        userDiv.innerHTML = `
+          <table style="width:100%">
+            <tr>
+              <th>First Name</th>
+              <th>Last Name</th>
+              <th>IP Address</th>
+            </tr>
+            <tr>
+              <td>${userData.firstname}</td>
+              <td>${userData.lastname}</td>
+              <td>${userData.ipaddress.replace(/_/g, '.')}</td>
+            </tr>
+          </table>
+          <hr>`;
+        usersTableContainer.appendChild(userDiv);
+      });
+    });
+}
+
+function filterUsers(searchTerm, searchBy) {
+  const userRows = document.querySelectorAll('.userRow');
+  userRows.forEach(row => {
+    let textContent = '';
+    switch (searchBy) {
+      case 'firstname':
+        textContent = row.querySelector('td:first-child').textContent.toLowerCase();
+        break;
+      case 'lastname':
+        textContent = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+        break;
+      case 'ipaddress':
+        textContent = row.querySelector('td:nth-child(3)').textContent.replace(/_/g, '.').toLowerCase();
+        break;
+      default:
+        break;
+    }
+    
+    if (textContent.includes(searchTerm)) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+}
+
+    window.onload = loadPage;
+  </script>
+
+  <div id="dashboard" style="display: none">
+    <h1>Foursquare Leaderboard Moderator Dashboard</h1>
+    <div>
+      <label id="moderatorKeyDisplay"></label><br />
+      <label id="dateTimeDisplay"></label><br /><br />
+      <label for="name">Name of Detail:</label><br />
+      <input type="text" id="name" name="name" /><br />
+      <label for="suggestedRank">Suggested Rank:</label><br />
+      <input type="text" id="suggestedRank" name="suggestedRank" /><br />
+      <label for="detail">Detail:</label><br />
+      <textarea id="detail" name="detail" rows="4"></textarea><br />
+      <button onclick="sendInfo()">Send</button>
+      <button onclick="refreshPage()">Logout</button>
+      <button onclick="goToHome()">Home</button>
+      <button onclick="openChat()">Chat</button>
+      <button onclick="openIpBanForm()">Ban IP</button>
+      <button onclick="openUsers()">Users</button>
+      <button onclick="requestFeature()">Request Feature/Report Bug</button>
+    </div>
+    <hr />
+    <h5>Abuse of your privileges will get your moderator status removed.</h5>
+    <h2>Existing Info:</h2>
+    <div id="infoContainer"></div>
+  </div>
+</body>
+</html>
