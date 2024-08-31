@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foursquare Leaderboard</title>
+    <style>
+        table {
+            width: 50%;
+            margin: auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        .rank-1 {
+            background-color: #ffd700;
+        }
+        .rank-2 {
+            background-color: #c0c0c0;
+        }
+        .rank-3 {
+            background-color: #cd7f32;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">Foursquare Leaderboard</h1>
+    <table id="leaderboard">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Name</th>
+                <th>Upvotes</th>
+                <th>Downvotes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Leaderboard data will be inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+        // Fetch the leaderboard data from the API
+        fetch('https://foursquare-leaderboard-default-rtdb.firebaseio.com/leaderboard.json', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            const leaderboardTable = document.getElementById('leaderboard').getElementsByTagName('tbody')[0];
+
+            // Iterate over each player in the data
+            for (const key in data) {
+                if (data.hasOwnProperty(key)) {
+                    const player = data[key];
+                    const row = leaderboardTable.insertRow();
+
+                    // Add classes for specific ranks (optional styling)
+                    if (player.rank === 1) row.classList.add('rank-1');
+                    if (player.rank === 2) row.classList.add('rank-2');
+                    if (player.rank === 3) row.classList.add('rank-3');
+
+                    // Insert cells into the row
+                    const cellRank = row.insertCell(0);
+                    const cellName = row.insertCell(1);
+                    const cellUpvotes = row.insertCell(2);
+                    const cellDownvotes = row.insertCell(3);
+
+                    // Populate cells with player data
+                    cellRank.textContent = player.rank;
+                    cellName.textContent = player.name;
+                    cellUpvotes.textContent = player.upvotes;
+                    cellDownvotes.textContent = player.downvotes;
+                }
+            }
+        })
+        .catch(error => console.error('Error fetching the leaderboard:', error));
+    </script>
+</body>
+</html>
