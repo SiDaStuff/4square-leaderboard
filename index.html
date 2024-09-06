@@ -219,6 +219,104 @@
     .account-btn:hover {
       background-color: #0056b3;
     }
+
+    .search-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    #search-bar {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      width: 300px;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+    }
+
+    #search-bar:focus {
+      border-color: #007bff;
+      outline: none;
+    }
+
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 120px;
+      background-color: #555;
+      color: #fff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 5px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      margin-left: -60px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      background-color: #fff;
+      padding: 10px 0;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #888;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 20px;
+      background-color: #f8f9fa;
+      border-top: 1px solid #ddd;
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background-color: #007bff;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .notification.show {
+      opacity: 1;
+    }
   </style>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.6.1/firebase-auth.js"></script>
@@ -229,9 +327,14 @@
 </head>
 
 <body>
-  <h1>Foursquare Leaderboard</h1>
-  <button class="account-btn" onclick="openAccount()">Account</button>
-  <div id="leaderboard-container">
+  <div class="sticky-header">
+    <h1>Foursquare Leaderboard</h1>
+    <button class="account-btn" onclick="openAccount()">Account</button>
+  </div>
+  <div id="leaderboard-container" class="custom-scrollbar">
+    <div class="search-container">
+      <input type="text" id="search-bar" placeholder="Search users..." oninput="filterLeaderboard()">
+    </div>
     <table id="leaderboard">
       <thead>
         <tr>
@@ -272,6 +375,10 @@
   <div class="error-message" id="errorMessage" style="display: none">
     Error: Failed to load leaderboard data.
   </div>
+  <div class="footer">
+    ©️ Sing Developments 2023
+  </div>
+  <div class="notification" id="notification">Notification</div>
 
   <script>
     const firebaseConfig = {
@@ -315,9 +422,9 @@
           '<input id="swal-input1" class="swal2-input" placeholder="Email" type="email">' +
           '<input id="swal-input2" class="swal2-input" placeholder="Password" type="password">',
         focusConfirm: false,
-        allowOutsideClick: false,
-        showCloseButton: false, // Disable the close button
-        allowEscapeKey: false,   // Disable closing with Escape key
+        allowOutsideClick: true,
+        showCloseButton: true, // Disable the close button
+        allowEscapeKey: true,   // Disable closing with Escape key
         preConfirm: () => {
           return [
             document.getElementById('swal-input1').value,
@@ -402,9 +509,9 @@
           '<input id="swal-input1" class="swal2-input" placeholder="Email" type="email">' +
           '<input id="swal-input2" class="swal2-input" placeholder="Password" type="password">',
         focusConfirm: false,
-        allowOutsideClick: false,
-        showCloseButton: false, // Disable the close button
-        allowEscapeKey: false,   // Disable closing with Escape key
+        allowOutsideClick: true,
+        showCloseButton: true, // Disable the close button
+        allowEscapeKey: true,   // Disable closing with Escape key
         preConfirm: () => {
           return [
             document.getElementById('swal-input1').value,
@@ -593,8 +700,14 @@
           <td>${entry.upvotes}</td>
           <td>${entry.downvotes}</td>
           <td>
-            <button class="action-btn" onclick="checkBanned(() => castVote('${id}', 'upvote'))">Upvote</button>
-            <button class="action-btn" onclick="checkBanned(() => castVote('${id}', 'downvote'))">Downvote</button>
+            <button class="action-btn tooltip" onclick="checkBanned(() => castVote('${id}', 'upvote'))">
+              Upvote
+              <span class="tooltiptext">Upvote this user</span>
+            </button>
+            <button class="action-btn tooltip" onclick="checkBanned(() => castVote('${id}', 'downvote'))">
+              Downvote
+              <span class="tooltiptext">Downvote this user</span>
+            </button>
           </td>
         `;
         tableBody.appendChild(row);
@@ -669,11 +782,7 @@
     function openAccount() {
       const user = firebase.auth().currentUser;
       if (!user) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'You need to be logged in to access your account.',
-        });
+        promptForLogin();  // Call the function to prompt for login if user is not logged in
         return;
       }
 
@@ -687,6 +796,7 @@
             <button class="action-btn" onclick="logout()">Logout</button>
             <button class="action-btn" onclick="resetPassword()">Reset Password</button>
             <button class="action-btn" onclick="showHistory()">Show History</button>
+            <button class="action-btn" onclick="editProfile()">Edit Profile</button>
             <button class="action-btn" onclick="Swal.close()">Close</button>
           `,
           showConfirmButton: false
@@ -782,6 +892,45 @@
       });
     }
 
+    function editProfile() {
+      const user = firebase.auth().currentUser;
+      if (!user) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'You need to be logged in to edit your profile.',
+        });
+        return;
+      }
+
+      firebase.database().ref(`users/${user.uid}`).once('value', (snapshot) => {
+        const userData = snapshot.val();
+        Swal.fire({
+          title: 'Edit Profile',
+          html: `
+            <input id="swal-input-name" class="swal2-input" placeholder="Name" value="${userData.name}">
+            <input id="swal-input-email" class="swal2-input" placeholder="Email" value="${user.email}" disabled>
+          `,
+          focusConfirm: false,
+          preConfirm: () => {
+            return {
+              name: document.getElementById('swal-input-name').value
+            }
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            const newName = result.value.name;
+            firebase.database().ref(`users/${user.uid}`).update({ name: newName });
+            Swal.fire({
+              icon: 'success',
+              title: 'Success',
+              text: 'Profile updated successfully.',
+            });
+          }
+        });
+      });
+    }
+
     function getBadge(name, rank) {
       let badges = "";
       if (name === "Silas") {
@@ -797,6 +946,33 @@
         badges += '<span class="badge badge-bronze">3</span>';
       }
       return badges;
+    }
+
+    function filterLeaderboard() {
+      const filter = document.getElementById('search-bar').value.toLowerCase();
+      const tableBody = document.querySelector("#leaderboard tbody");
+      const rows = tableBody.getElementsByTagName("tr");
+
+      for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName("td");
+        let match = false;
+        for (let j = 0; j < cells.length; j++) {
+          if (cells[j].textContent.toLowerCase().includes(filter)) {
+            match = true;
+            break;
+          }
+        }
+        rows[i].style.display = match ? "" : "none";
+      }
+    }
+
+    function showNotification(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.classList.add('show');
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, 3000);
     }
 
     collectUserData();

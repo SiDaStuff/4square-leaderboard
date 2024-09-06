@@ -44,7 +44,7 @@
 
 <h2>Step 1: Accessing the User List</h2>
 
-<p>To get a list of all users ranked from top to bottom, you need to use the following fetch request:</p>
+<p>To get a list of all users ranked, you need to use the following fetch request:</p>
 
 <div class="example">
     <pre>
@@ -60,34 +60,34 @@ fetch('https://foursquare-leaderboard-default-rtdb.firebaseio.com/leaderboard.js
     </pre>
 </div>
 
-<p>When you execute this fetch request, you will receive a list of players. The players are ordered by their rank, with the top players at the top of the list and the bottom players at the bottom. For example:</p>
+<p>When you execute this fetch request, you will receive a list of players. For example:</p>
 
 <div class="example">
     <pre>
       {
-        "-NvvOLwaGy5BEHZf4zpk": {
+        "Player1": {
             "downvotes": 3,
             "name": "Player1",
             "rank": 1,
             "upvotes": 8
         },
-        "-NxwMFGwUhSO6vdpycZd": {
+        "Player2": {
             "downvotes": 2,
             "name": "Player2",
-            "rank": 2,
+            "rank": 3,
             "upvotes": 7
         },
-        "-NxwMFGwUhSO6vdpycZe": {
+        "-Player3": {
             "downvotes": 0,
             "name": "Player3",
-            "rank": 3,
+            "rank": 2,
             "upvotes": 7
         }
     }
     </pre>
 </div>
 
-<p>In the example above, Player1 has 3 Downvotes, 8 Upvotes, and the rank of 1. Player2 has 2 Downvotes, 7 Upvotes, the rank of 2... etc and so own down the list for each player.</p>
+<p>In the example above, Player1 has 3 Downvotes, 8 Upvotes, and the rank of 1. Player2 has 2 Downvotes, 7 Upvotes, the rank of 3... etc and so own down the list for each player.</p>
 
 <p>Here is an example of how you can use this api:</p>
  <p class="api-url"><a href="example-api.html">API Usage Example</a></p>

@@ -53,36 +53,49 @@
                 'Content-Type': 'application/json',
             },
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok ' + response.statusText);
+            }
+            return response.json();
+        })
         .then(data => {
             const leaderboardTable = document.getElementById('leaderboard').getElementsByTagName('tbody')[0];
 
-            // Iterate over each player in the data
-            for (const key in data) {
-                if (data.hasOwnProperty(key)) {
-                    const player = data[key];
-                    const row = leaderboardTable.insertRow();
+            // Sort players by rank
+            const sortedPlayers = Object.keys(data).map(key => data[key]).sort((a, b) => a.rank - b.rank);
 
-                    // Add classes for specific ranks (optional styling)
-                    if (player.rank === 1) row.classList.add('rank-1');
-                    if (player.rank === 2) row.classList.add('rank-2');
-                    if (player.rank === 3) row.classList.add('rank-3');
+            // Iterate over each player and insert into the table
+            sortedPlayers.forEach(player => {
+                const row = leaderboardTable.insertRow();
 
-                    // Insert cells into the row
-                    const cellRank = row.insertCell(0);
-                    const cellName = row.insertCell(1);
-                    const cellUpvotes = row.insertCell(2);
-                    const cellDownvotes = row.insertCell(3);
+                // Add classes for specific ranks (optional styling)
+                if (player.rank === 1) row.classList.add('rank-1');
+                if (player.rank === 2) row.classList.add('rank-2');
+                if (player.rank === 3) row.classList.add('rank-3');
 
-                    // Populate cells with player data
-                    cellRank.textContent = player.rank;
-                    cellName.textContent = player.name;
-                    cellUpvotes.textContent = player.upvotes;
-                    cellDownvotes.textContent = player.downvotes;
-                }
-            }
+                // Insert cells into the row
+                const cellRank = row.insertCell(0);
+                const cellName = row.insertCell(1);
+                const cellUpvotes = row.insertCell(2);
+                const cellDownvotes = row.insertCell(3);
+
+                // Populate cells with player data
+                cellRank.textContent = player.rank;
+                cellName.textContent = player.name;
+                cellUpvotes.textContent = player.upvotes;
+                cellDownvotes.textContent = player.downvotes;
+            });
         })
-        .catch(error => console.error('Error fetching the leaderboard:', error));
+        .catch(error => {
+            console.error('Error fetching the leaderboard:', error);
+            const leaderboardTable = document.getElementById('leaderboard').getElementsByTagName('tbody')[0];
+            const row = leaderboardTable.insertRow();
+            const cell = row.insertCell(0);
+            cell.colSpan = 4;
+            cell.textContent = 'Failed to load leaderboard data. Please try again later.';
+            cell.style.textAlign = 'center';
+        });
     </script>
 </body>
 </html>

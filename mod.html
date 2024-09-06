@@ -165,6 +165,17 @@
     .refreshButton:hover {
       background-color: #66a3ff;
     }
+    .notification {
+      background-color: #ffeb3b;
+      color: #000;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .notification.error {
+      background-color: #ff0000;
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -250,6 +261,11 @@ const firebaseConfig = {
               setInterval(refreshChat, 1000);
               getUserName(userId);
               setInterval(checkUserBanPeriodically, 1000);
+
+              // Show the "Add Notification" button if the user ID is o548WLH1w3Qh0S2Yng5RtPYZWtS2
+              if (userId === "o548WLH1w3Qh0S2Yng5RtPYZWtS2") {
+                document.getElementById("addNotificationButton").style.display = "inline-block";
+              }
             })
             .catch(error => {
               Swal.showValidationMessage(`${error.message}`);
@@ -780,6 +796,148 @@ const firebaseConfig = {
       return true;
     }
 
+    function showNotifications() {
+      if (!validateModeratorStatus()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        Swal.fire({
+          title: 'Notifications',
+          html: `
+            <div id="notificationsContainer"></div>
+          `,
+          showCloseButton: true,
+          didOpen: () => {
+            fetchNotifications();
+          },
+          customClass: {
+            container: 'users-swal2-modal'
+          }
+        });
+      });
+    }
+
+    function fetchNotifications() {
+      const notificationsContainer = document.getElementById('notificationsContainer');
+      db.ref('notifications')
+        .on('value', (snapshot) => {
+          notificationsContainer.innerHTML = '';
+          snapshot.forEach((notificationSnapshot) => {
+            const notificationData = notificationSnapshot.val();
+            const notificationDiv = document.createElement('div');
+            notificationDiv.classList.add('notification');
+            notificationDiv.innerHTML = `
+              <strong>${notificationData.title}</strong><br>
+              ${notificationData.message}<br>
+              <small>${new Date(notificationData.timestamp).toLocaleString()}</small>
+            `;
+            notificationsContainer.appendChild(notificationDiv);
+          });
+        });
+    }
+
+    function addNotification() {
+      if (!validateModeratorStatus()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        Swal.fire({
+          title: 'Add Notification',
+          html: `
+            <label for="notificationTitle">Title:</label>
+            <input type="text" id="notificationTitle" class="swal2-input"><br>
+            <label for="notificationMessage">Message:</label>
+            <textarea id="notificationMessage" class="swal2-textarea"></textarea><br>
+          `,
+          focusConfirm: false,
+          showCancelButton: true,
+          confirmButtonText: 'Add',
+          preConfirm: () => {
+            const title = document.getElementById('notificationTitle').value;
+            const message = document.getElementById('notificationMessage').value;
+            if (!title || !message) {
+              Swal.showValidationMessage('Please enter a title and message');
+              return false;
+            }
+            return { title, message };
+          },
+        }).then((result) => {
+          if (result.isConfirmed) {
+            const { title, message } = result.value;
+            db.ref('notifications').push({
+              title: title,
+              message: message,
+              timestamp: firebase.database.ServerValue.TIMESTAMP,
+            }).then(() => {
+              Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: 'Notification added successfully.',
+              });
+            });
+          }
+        });
+      });
+    }
+
+    function showLeaderboard() {
+      if (!validateModeratorStatus()) return;
+      checkIpBan(userIp).then(isBanned => {
+        if (isBanned) return;
+
+        Swal.fire({
+          title: 'Leaderboard',
+          html: `
+            <div id="leaderboardContainer"></div>
+          `,
+          showCloseButton: true,
+          didOpen: () => {
+            fetchLeaderboard();
+          },
+          customClass: {
+            container: 'leaderboard-swal2-modal'
+          }
+        });
+      });
+    }
+
+    function fetchLeaderboard() {
+      const leaderboardContainer = document.getElementById('leaderboardContainer');
+      fetch('https://foursquare-leaderboard-default-rtdb.firebaseio.com/leaderboard.json', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      .then(response => response.json())
+      .then(data => {
+        leaderboardContainer.innerHTML = '';
+        const leaderboardTable = document.createElement('table');
+        leaderboardTable.style.width = '100%';
+        leaderboardTable.innerHTML = `
+          <tr>
+            <th>Rank</th>
+            <th>Name</th>
+            <th>Upvotes</th>
+            <th>Downvotes</th>
+          </tr>
+        `;
+        const sortedUsers = Object.values(data).sort((a, b) => a.rank - b.rank);
+        sortedUsers.forEach((userData, index) => {
+          const userRow = document.createElement('tr');
+          userRow.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${userData.name}</td>
+            <td>${userData.upvotes}</td>
+            <td>${userData.downvotes}</td>
+          `;
+          leaderboardTable.appendChild(userRow);
+        });
+        leaderboardContainer.appendChild(leaderboardTable);
+      })
+      .catch(error => console.error('Error fetching the leaderboard:', error));
+    }
+
     window.onload = loadPage;
   </script>
 
@@ -801,6 +959,9 @@ const firebaseConfig = {
       <button onclick="openIpBanForm()">Ban</button>
       <button onclick="openUsers()">Users</button>
       <button class="refreshButton" onclick="refreshInfoContainer()">Refresh Info</button>
+      <button onclick="showNotifications()">Notifications</button>
+      <button id="addNotificationButton" style="display: none;" onclick="addNotification()">Add Notification</button>
+      <button onclick="showLeaderboard()">Leaderboard</button>
     </div>
     <hr />
     <h5>Abuse of your privileges will get your moderator status removed.</h5>
